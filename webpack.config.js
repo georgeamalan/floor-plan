@@ -1,10 +1,9 @@
 const webpack = require('webpack');
 const path = require('path');
-const OpenBrowserPlugin = require('open-browser-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 const fs = require('fs');
 const gitRev = require('git-rev-sync');
+
 const getGitLong = () => {
   try {
     return fs.readFileSync('./REVISION', 'utf8').trim();
@@ -13,118 +12,100 @@ const getGitLong = () => {
   }
 };
 
+const PAGE_TITLE = 'React Planner';
+
 /**
- * --env.port port
+ * --env port=<port>
+ * --env quiet=true
  */
+module.exports = function (env = {}) {
+  const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  const isProduction = mode === 'production';
+  const isQuiet = Boolean(env.quiet);
+  const port = env.port || 8080;
 
-const PAGE_TITLE = "React Planner";
-const VENDORS_LIBRARIES = ['immutable', 'react', 'react-dom', 'react-redux', 'redux', 'three'];
+  console.info(`Webpack: ${isProduction ? 'Production' : 'Development'} mode`);
 
-module.exports = function (env) {
-  let isProduction = process.env.NODE_ENV === 'production';
-  let isQuiet = env && env.hasOwnProperty('quiet');
-  let port = env && env.hasOwnProperty('port') ? env.port : 8080;
-
-  if (isProduction) console.info('Webpack: Production mode'); else console.info('Webpack: Development mode');
-
-  let config = {
+  return {
+    mode,
     context: path.resolve(__dirname),
     entry: {
       app: path.join(__dirname, './src/demo/src/renderer.jsx'),
-      vendor: VENDORS_LIBRARIES
     },
     output: {
       path: path.join(__dirname, 'dist'),
-      filename: '[chunkhash].[name].js',
+      filename: isProduction ? '[contenthash].[name].js' : '[name].js',
+      clean: true,
     },
     performance: {
-      hints: isProduction ? 'warning' : false
+      hints: isProduction ? 'warning' : false,
     },
-    devtool: isProduction ? 'source-map' : 'eval',
+    devtool: isProduction ? 'source-map' : 'eval-source-map',
     devServer: {
-      port: port,
-      contentBase: path.join(__dirname, './dist'),
-      overlay: {
-        warnings: true,
-        errors: true
+      port,
+      static: {
+        directory: path.join(__dirname, './dist'),
       },
-      inline: true
+      client: {
+        overlay: {
+          warnings: true,
+          errors: true,
+        },
+      },
+      open: true,
     },
     resolve: {
-      extensions: ['.js', '.jsx']
+      extensions: ['.js', '.jsx'],
+      fallback: {
+        path: require.resolve('path-browserify'),
+      },
     },
     module: {
-      rules: [{
-        test: /\.(js|jsx)$/,
-        exclude: /node_modules/,
-        use: [{
-          loader: 'babel-loader',
-          options: {
-            "compact": false,
-            "plugins": [
-              "transform-object-rest-spread"
-            ],
-            "presets": [
-              "react"
-            ]
-          }
-
-        }]
-      }, {
-        test: /\.(jpe?g|png|gif|mtl|obj)$/i,
-        use: [{
-          loader: 'file-loader',
-          options: {
-            hash: 'sha512',
-            digest: 'hex',
-            name: '[path][name].[ext]',
-            context: 'demo/src'
-          }
-        }]
-      }]
+      rules: [
+        {
+          test: /\.(js|jsx)$/,
+          exclude: /node_modules/,
+          use: {
+            loader: 'babel-loader',
+            options: {
+              cacheDirectory: true,
+              presets: [
+                ['@babel/preset-env', { targets: 'defaults' }],
+                ['@babel/preset-react', { runtime: 'classic' }],
+              ],
+              plugins: ['@babel/plugin-transform-object-rest-spread'],
+            },
+          },
+        },
+        {
+          test: /\.(jpe?g|png|gif|mtl|obj)$/i,
+          type: 'asset/resource',
+          generator: {
+            filename: 'assets/[path][name][contenthash][ext]',
+          },
+        },
+      ],
+    },
+    optimization: {
+      splitChunks: {
+        chunks: 'all',
+      },
+      runtimeChunk: 'single',
     },
     plugins: [
-      new webpack.optimize.CommonsChunkPlugin({
-        names: 'vendor',
-        chunks: ['vendor', 'app'],
-        minChunks: 2
-      }),
-      new webpack.optimize.CommonsChunkPlugin({
-        names: 'app',
-        chunks: ['app'],
-        minChunks: 2
-      }),
-      new webpack.optimize.CommonsChunkPlugin({
-        names: ['manifest']
-      }),
       new webpack.DefinePlugin({
-        'process.env': {
-          NODE_ENV: JSON.stringify(process.env.NODE_ENV || 'development'),
-        },
+        'process.env.NODE_ENV': JSON.stringify(mode),
         defineREV: JSON.stringify(getGitLong()),
-        defineVersion: JSON.stringify(require('./package.json').version)
+        defineVersion: JSON.stringify(require('./package.json').version),
       }),
       new HtmlWebpackPlugin({
         title: PAGE_TITLE,
         template: './src/demo/src/index.html.ejs',
         filename: 'index.html',
         inject: 'body',
-      })
-    ]
+      }),
+    ],
+    infrastructureLogging: { level: isQuiet ? 'error' : 'info' },
+    stats: isQuiet ? 'errors-warnings' : 'normal',
   };
-
-  if (isProduction) {
-    config.plugins.push(new UglifyJSPlugin({
-      sourceMap: config.devtool && (
-        config.devtool.indexOf('sourcemap') >= 0 ||
-        config.devtool.indexOf('source-map') >= 0
-      )
-    }));
-  }
-
-  if (!isProduction) {
-    config.plugins.push(new OpenBrowserPlugin({url: `http://localhost:${port}`}));
-  }
-
-  return config;
 };

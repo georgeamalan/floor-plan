@@ -1,14 +1,20 @@
 {
-  "plugins": [
-    "transform-object-rest-spread",
-    "import-glob"
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "targets": "defaults"
+      }
+    ],
+    [
+      "@babel/preset-react",
+      {
+        "runtime": "classic"
+      }
+    ]
   ],
-  "env": {
-    "commonjs": {
-      "presets": ["es2015", "react"]
-    },
-    "es": {
-      "presets": [["es2015", { "modules": false }], "react"]
-    }
-  }
+  "plugins": [
+    "@babel/plugin-transform-object-rest-spread",
+    "babel-plugin-import-glob"
+  ]
 }
