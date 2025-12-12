@@ -11,8 +11,7 @@ import {
   MeshLambertMaterial,
   RepeatWrapping,
   Vector2,
-  BoxHelper,
-  VertexColors
+  BoxHelper
 } from 'three';
 
 const bboxColor = 0x99c3fb;
@@ -28,7 +27,7 @@ const createBoxHelper = (wall, color) => {
   let box = new BoxHelper(wall, color);
   box.material.depthTest = false;
   box.material.linewidth = 2;
-  box.material.vertexColor = VertexColors;
+  box.material.vertexColors = true;
   box.renderOrder = 1000;
   return box;
 };
